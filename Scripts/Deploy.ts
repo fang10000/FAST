@@ -1,35 +1,64 @@
-import { ethers } from "hardhat";
-import * as dotenv from "dotenv";
-
-dotenv.config();
+import { publicClient, walletClient, deployer, governorAddress, minterAddress } from './Config';
+import { parseUnits, formatEther } from 'viem';
+import { abi, bytecode } from '../artifacts/contracts/FASToken.sol/FractionalAllowanceStablecoin.json';
 
 async function main() {
-  const [deployer, governor, minter] = await ethers.getSigners();
+  const deployerAddress = deployer.address;
 
-  console.log("Deploying contracts with the account:", deployer.address);
-  console.log("Governor address:", governor.address);
-  console.log("Minter address:", minter.address);
+  console.log("Deployer address:", deployerAddress);
+  console.log("Governor address:", governorAddress);
+  console.log("Minter address:", minterAddress);
 
-  const balance = await deployer.getBalance();
-  console.log("Account balance:", balance.toString());
+  try {
+    const balance = await publicClient.getBalance({ address: deployerAddress });
+    console.log("Account balance:", formatEther(balance));
+  } catch (error) {
+    console.error("Error fetching balance:", error);
+    return;
+  }
 
-  const FASToken = await ethers.getContractFactory("FractionalAllowanceStablecoin");
-  const token = await FASToken.deploy(
+  const initialSupply = 1000000;
+  const initialFractionInBps = 100;
+
+  console.log("Deploying contract with the following parameters:");
+  console.log("ABI:", JSON.stringify(abi, null, 2));
+  console.log("Bytecode:", bytecode);
+  console.log("Constructor arguments:", [
     "FractionalAllowanceStablecoin", // name
     "FAST", // symbol
-    ethers.utils.parseUnits("1000000", 18), // initialSupply
-    deployer.address, // deployerAddress
-    governor.address, // governanceAddress
-    minter.address, // minterAddress
-    100 // initialFractionInBps
-  );
+    initialSupply, // initialSupply
+    deployerAddress, // adminAddress
+    governorAddress, // governanceAddress
+    minterAddress, // minterAddress
+    initialFractionInBps // initialFractionInBps
+  ]);
 
-  console.log("Token address:", token.address);
+  try {
+    const tx = await walletClient.deployContract({
+      abi,
+      bytecode: bytecode as `0x${string}`, // Ensure the bytecode is prefixed with 0x
+      args: [
+        "FractionalAllowanceStablecoin", // name
+        "FAST", // symbol
+        initialSupply, // initialSupply
+        deployerAddress, // adminAddress
+        governorAddress, // governanceAddress
+        minterAddress, // minterAddress
+        initialFractionInBps // initialFractionInBps
+      ],
+    });
+
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: tx });
+    console.log(`Contract deployed at ${receipt.contractAddress}`);
+  } catch (error) {
+    console.error("Error deploying contract:", error);
+  }
 }
 
 main()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error(error);
+    console.error("Error in main function:", error);
     process.exit(1);
   });
+

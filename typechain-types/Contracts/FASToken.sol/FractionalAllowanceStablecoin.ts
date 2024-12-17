@@ -31,19 +31,25 @@ export interface FractionalAllowanceStablecoinInterface extends Interface {
       | "MINTER_ROLE"
       | "allowance"
       | "approve"
+      | "approveMinterFractionUpdate"
       | "balanceOf"
       | "decimals"
+      | "dripInterval"
+      | "dripSpeed"
       | "fractionInBps"
       | "getRoleAdmin"
       | "grantRole"
       | "hasRole"
+      | "lastDripTime"
       | "mint"
       | "minterAllowance"
       | "name"
       | "renounceRole"
       | "replenishMinterAllowance"
+      | "requestMinterFractionUpdate"
       | "revokeRole"
-      | "setMinterFraction"
+      | "setDripInterval"
+      | "setDripSpeed"
       | "supportsInterface"
       | "symbol"
       | "totalSupply"
@@ -54,6 +60,8 @@ export interface FractionalAllowanceStablecoinInterface extends Interface {
   getEvent(
     nameOrSignatureOrTopic:
       | "Approval"
+      | "FractionRequestApproved"
+      | "FractionRequestCreated"
       | "RoleAdminChanged"
       | "RoleGranted"
       | "RoleRevoked"
@@ -81,10 +89,19 @@ export interface FractionalAllowanceStablecoinInterface extends Interface {
     values: [AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "approveMinterFractionUpdate",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "balanceOf",
     values: [AddressLike]
   ): string;
   encodeFunctionData(functionFragment: "decimals", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "dripInterval",
+    values?: undefined
+  ): string;
+  encodeFunctionData(functionFragment: "dripSpeed", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "fractionInBps",
     values?: undefined
@@ -100,6 +117,10 @@ export interface FractionalAllowanceStablecoinInterface extends Interface {
   encodeFunctionData(
     functionFragment: "hasRole",
     values: [BytesLike, AddressLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "lastDripTime",
+    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "mint",
@@ -119,11 +140,19 @@ export interface FractionalAllowanceStablecoinInterface extends Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "requestMinterFractionUpdate",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "revokeRole",
     values: [BytesLike, AddressLike]
   ): string;
   encodeFunctionData(
-    functionFragment: "setMinterFraction",
+    functionFragment: "setDripInterval",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setDripSpeed",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
@@ -158,8 +187,17 @@ export interface FractionalAllowanceStablecoinInterface extends Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "allowance", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "approve", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "approveMinterFractionUpdate",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "decimals", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "dripInterval",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "dripSpeed", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "fractionInBps",
     data: BytesLike
@@ -170,6 +208,10 @@ export interface FractionalAllowanceStablecoinInterface extends Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "grantRole", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "hasRole", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "lastDripTime",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "mint", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "minterAllowance",
@@ -184,9 +226,17 @@ export interface FractionalAllowanceStablecoinInterface extends Interface {
     functionFragment: "replenishMinterAllowance",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "requestMinterFractionUpdate",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "revokeRole", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "setMinterFraction",
+    functionFragment: "setDripInterval",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setDripSpeed",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -216,6 +266,35 @@ export namespace ApprovalEvent {
     owner: string;
     spender: string;
     value: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace FractionRequestApprovedEvent {
+  export type InputTuple = [fractionInBps: BigNumberish, approver: AddressLike];
+  export type OutputTuple = [fractionInBps: bigint, approver: string];
+  export interface OutputObject {
+    fractionInBps: bigint;
+    approver: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace FractionRequestCreatedEvent {
+  export type InputTuple = [
+    fractionInBps: BigNumberish,
+    requester: AddressLike
+  ];
+  export type OutputTuple = [fractionInBps: bigint, requester: string];
+  export interface OutputObject {
+    fractionInBps: bigint;
+    requester: string;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -360,9 +439,15 @@ export interface FractionalAllowanceStablecoin extends BaseContract {
     "nonpayable"
   >;
 
+  approveMinterFractionUpdate: TypedContractMethod<[], [void], "nonpayable">;
+
   balanceOf: TypedContractMethod<[account: AddressLike], [bigint], "view">;
 
   decimals: TypedContractMethod<[], [bigint], "view">;
+
+  dripInterval: TypedContractMethod<[], [bigint], "view">;
+
+  dripSpeed: TypedContractMethod<[], [bigint], "view">;
 
   fractionInBps: TypedContractMethod<[], [bigint], "view">;
 
@@ -379,6 +464,8 @@ export interface FractionalAllowanceStablecoin extends BaseContract {
     [boolean],
     "view"
   >;
+
+  lastDripTime: TypedContractMethod<[], [bigint], "view">;
 
   mint: TypedContractMethod<
     [to: AddressLike, amount: BigNumberish],
@@ -398,14 +485,26 @@ export interface FractionalAllowanceStablecoin extends BaseContract {
 
   replenishMinterAllowance: TypedContractMethod<[], [void], "nonpayable">;
 
+  requestMinterFractionUpdate: TypedContractMethod<
+    [newFractionInBps: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+
   revokeRole: TypedContractMethod<
     [role: BytesLike, account: AddressLike],
     [void],
     "nonpayable"
   >;
 
-  setMinterFraction: TypedContractMethod<
-    [newFractionInBps: BigNumberish],
+  setDripInterval: TypedContractMethod<
+    [newDripInterval: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+
+  setDripSpeed: TypedContractMethod<
+    [newDripSpeed: BigNumberish],
     [void],
     "nonpayable"
   >;
@@ -460,10 +559,19 @@ export interface FractionalAllowanceStablecoin extends BaseContract {
     "nonpayable"
   >;
   getFunction(
+    nameOrSignature: "approveMinterFractionUpdate"
+  ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
     nameOrSignature: "balanceOf"
   ): TypedContractMethod<[account: AddressLike], [bigint], "view">;
   getFunction(
     nameOrSignature: "decimals"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "dripInterval"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "dripSpeed"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
     nameOrSignature: "fractionInBps"
@@ -485,6 +593,9 @@ export interface FractionalAllowanceStablecoin extends BaseContract {
     [boolean],
     "view"
   >;
+  getFunction(
+    nameOrSignature: "lastDripTime"
+  ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
     nameOrSignature: "mint"
   ): TypedContractMethod<
@@ -509,6 +620,13 @@ export interface FractionalAllowanceStablecoin extends BaseContract {
     nameOrSignature: "replenishMinterAllowance"
   ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
+    nameOrSignature: "requestMinterFractionUpdate"
+  ): TypedContractMethod<
+    [newFractionInBps: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
     nameOrSignature: "revokeRole"
   ): TypedContractMethod<
     [role: BytesLike, account: AddressLike],
@@ -516,12 +634,11 @@ export interface FractionalAllowanceStablecoin extends BaseContract {
     "nonpayable"
   >;
   getFunction(
-    nameOrSignature: "setMinterFraction"
-  ): TypedContractMethod<
-    [newFractionInBps: BigNumberish],
-    [void],
-    "nonpayable"
-  >;
+    nameOrSignature: "setDripInterval"
+  ): TypedContractMethod<[newDripInterval: BigNumberish], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "setDripSpeed"
+  ): TypedContractMethod<[newDripSpeed: BigNumberish], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "supportsInterface"
   ): TypedContractMethod<[interfaceId: BytesLike], [boolean], "view">;
@@ -552,6 +669,20 @@ export interface FractionalAllowanceStablecoin extends BaseContract {
     ApprovalEvent.InputTuple,
     ApprovalEvent.OutputTuple,
     ApprovalEvent.OutputObject
+  >;
+  getEvent(
+    key: "FractionRequestApproved"
+  ): TypedContractEvent<
+    FractionRequestApprovedEvent.InputTuple,
+    FractionRequestApprovedEvent.OutputTuple,
+    FractionRequestApprovedEvent.OutputObject
+  >;
+  getEvent(
+    key: "FractionRequestCreated"
+  ): TypedContractEvent<
+    FractionRequestCreatedEvent.InputTuple,
+    FractionRequestCreatedEvent.OutputTuple,
+    FractionRequestCreatedEvent.OutputObject
   >;
   getEvent(
     key: "RoleAdminChanged"
@@ -592,6 +723,28 @@ export interface FractionalAllowanceStablecoin extends BaseContract {
       ApprovalEvent.InputTuple,
       ApprovalEvent.OutputTuple,
       ApprovalEvent.OutputObject
+    >;
+
+    "FractionRequestApproved(uint256,address)": TypedContractEvent<
+      FractionRequestApprovedEvent.InputTuple,
+      FractionRequestApprovedEvent.OutputTuple,
+      FractionRequestApprovedEvent.OutputObject
+    >;
+    FractionRequestApproved: TypedContractEvent<
+      FractionRequestApprovedEvent.InputTuple,
+      FractionRequestApprovedEvent.OutputTuple,
+      FractionRequestApprovedEvent.OutputObject
+    >;
+
+    "FractionRequestCreated(uint256,address)": TypedContractEvent<
+      FractionRequestCreatedEvent.InputTuple,
+      FractionRequestCreatedEvent.OutputTuple,
+      FractionRequestCreatedEvent.OutputObject
+    >;
+    FractionRequestCreated: TypedContractEvent<
+      FractionRequestCreatedEvent.InputTuple,
+      FractionRequestCreatedEvent.OutputTuple,
+      FractionRequestCreatedEvent.OutputObject
     >;
 
     "RoleAdminChanged(bytes32,bytes32,bytes32)": TypedContractEvent<
