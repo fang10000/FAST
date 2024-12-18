@@ -10,52 +10,16 @@ contract FractionalAllowanceStablecoin is ERC20, AccessControl {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     // The fraction of total supply that the minter is allowed, expressed in basis points
-    // e.g., fractionInBps = 100 means 1% (100/10,000)
+    // e.g., fractionInBps = 100 means 1%
     uint256 public fractionInBps;
     // Tracks the current minter allowance in tokens
     uint256 public minterAllowance;
 
     // Drip model variables
-    uint256 public dripSpeed = 1; // 1/100 of fractionInBps
-    uint256 public dripInterval = 60; // 60 seconds
-    uint256 public lastDripTime; // Last time the drip was called
-
-    constructor(
-        string memory name_,
-        string memory symbol_,
-        uint256 initialSupply_,
-        address adminAddress,
-        address governanceAddress,
-        address minterAddress,
-        uint256 initialFractionInBps
-    ) ERC20(name_, symbol_) {
-        // Grant initial roles
-        _grantRole(DEFAULT_ADMIN_ROLE, adminAddress);
-        _grantRole(GOVERNANCE_ROLE, governanceAddress);
-        _grantRole(MINTER_ROLE, minterAddress);
-
-        // Mint initial supply to governance or a treasury wallet
-        _mint(adminAddress, initialSupply_);
-
-        // Set initial fraction and calculate initial minter allowance
-        fractionInBps = initialFractionInBps;
-        minterAllowance = _calculateMinterAllowance();
-        lastDripTime = block.timestamp;
-    }
-
-    /**
-     * @dev Mint new tokens. Only the address with MINTER_ROLE can call this.
-     * Must not exceed current minterAllowance.
-     */
-    function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
-        _applyDrip();
-        require(
-            amount <= minterAllowance,
-            "FractionalAllowanceStablecoin: amount exceeds minter allowance"
-        );
-        minterAllowance -= amount;
-        _mint(to, amount);
-    }
+    uint256 public dripAmount = 50;
+    uint256 public dripInterval = 60;
+    uint256 public maxAllowance;
+    uint256 public lastDripTime;
 
     /**
      * @dev Set the fraction of total supply that defines the minter allowance.
@@ -91,30 +55,85 @@ contract FractionalAllowanceStablecoin is ERC20, AccessControl {
     emit FractionRequestApproved(pendingFractionRequest.fractionInBps, msg.sender);
 }
 
-    /**
-     * @dev Recalculate the minter’s allowance based on the current total supply and fraction.
-     * Can only be called by governance.
-     */
-    function replenishMinterAllowance() external onlyRole(GOVERNANCE_ROLE) {
+    struct DripAmountRequest {
+        uint256 newDripAmount;
+        address requester;
+        bool isPending;
+    }
+
+    DripAmountRequest private pendingDripAmountRequest;
+
+    event DripAmountRequestCreated(uint256 newDripAmount, address requester);
+    event DripAmountRequestApproved(uint256 newDripAmount, address approver);
+
+    constructor(
+        string memory name_,
+        string memory symbol_,
+        uint256 initialSupply_,
+        address adminAddress,
+        address governanceAddress,
+        address minterAddress,
+        uint256 initialFractionInBps
+    ) ERC20(name_, symbol_) {
+        // Grant initial roles
+        _grantRole(DEFAULT_ADMIN_ROLE, adminAddress);
+        _grantRole(GOVERNANCE_ROLE, governanceAddress);
+        _grantRole(MINTER_ROLE, minterAddress);
+
+        // Mint initial supply to governance or a treasury wallet
+        _mint(adminAddress, initialSupply_);
+
+        // Set initial fraction and calculate initial minter allowance
+        fractionInBps = initialFractionInBps;
         minterAllowance = _calculateMinterAllowance();
+        maxAllowance = _calculateMinterAllowance();
+        lastDripTime = block.timestamp;
     }
 
     /**
-     * @dev Set the drip speed. Can only be called by GOVERNANCE_ROLE.
+     * @dev Mint new tokens. Only the address with MINTER_ROLE can call this.
+     * Must not exceed current minterAllowance.
      */
-    function setDripSpeed(
-        uint256 newDripSpeed
-    ) external onlyRole(GOVERNANCE_ROLE) {
-        dripSpeed = newDripSpeed;
+    function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
+        require(
+            amount <= minterAllowance,
+            "FractionalAllowanceStablecoin: amount exceeds minter allowance"
+        );
+        minterAllowance -= amount;
+        _mint(to, amount);
     }
 
-    /**
-     * @dev Set the drip interval. Can only be called by GOVERNANCE_ROLE.
-     */
-    function setDripInterval(
-        uint256 newDripInterval
-    ) external onlyRole(GOVERNANCE_ROLE) {
-        dripInterval = newDripInterval;
+    // Function to request a drip amount update
+    function requestDripAmountUpdate(uint256 newDripAmount) public onlyRole(MINTER_ROLE) {
+        pendingDripAmountRequest = DripAmountRequest({
+            newDripAmount: newDripAmount,
+            requester: msg.sender,
+            isPending: true
+        });
+        emit DripAmountRequestCreated(newDripAmount, msg.sender);
+    }
+
+    // Function to approve the requested drip amount update
+    function approveDripAmountUpdate() public onlyRole(GOVERNANCE_ROLE) {
+        require(pendingDripAmountRequest.isPending, "No pending request");
+        dripAmount = pendingDripAmountRequest.newDripAmount;
+        pendingDripAmountRequest.isPending = false;
+        emit DripAmountRequestApproved(pendingDripAmountRequest.newDripAmount, msg.sender);
+    }
+
+    // External function to apply the drip
+    function applyDrip() external onlyRole(MINTER_ROLE) {
+        uint256 currentTime = block.timestamp;
+        if (currentTime > lastDripTime) {
+            uint256 timeElapsed = currentTime - lastDripTime;
+            uint256 topUpAmount = (timeElapsed / dripInterval) * dripAmount;
+            maxAllowance = _calculateMinterAllowance();
+            if (minterAllowance + topUpAmount > maxAllowance) {
+                topUpAmount = maxAllowance - minterAllowance;
+            }
+            minterAllowance += topUpAmount;
+            lastDripTime = currentTime;
+        }
     }
 
     /**
@@ -125,22 +144,8 @@ contract FractionalAllowanceStablecoin is ERC20, AccessControl {
         return (total * fractionInBps) / 10000;
     }
 
-    /**
-     * @dev Internal function to apply the drip model.
-     */
-    function _applyDrip() internal {
-        uint256 currentTime = block.timestamp;
-        if (currentTime >= lastDripTime + dripInterval) {
-            uint256 intervalsPassed = (currentTime - lastDripTime) /
-                dripInterval;
-            uint256 dripAmount = (minterAllowance *
-                dripSpeed *
-                intervalsPassed) / 100;
-            uint256 maxAllowance = _calculateMinterAllowance();
-            minterAllowance = minterAllowance + dripAmount > maxAllowance
-                ? maxAllowance
-                : minterAllowance + dripAmount;
-            lastDripTime = currentTime;
-        }
+    // Function to replenish minter allowance
+    function replenishMinterAllowance() external onlyRole(GOVERNANCE_ROLE) {
+        minterAllowance = _calculateMinterAllowance();
     }
 }

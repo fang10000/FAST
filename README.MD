@@ -2,20 +2,23 @@
 
 ## Overview
 
-Fractional Allowance Stablecoin (FAST) is an ERC20 token with role-based access control, allowing for fractional minting allowances. The contract leverages OpenZeppelin's libraries for secure and robust implementation. The primary features include role-based minting permissions, the ability to set fractional minting allowances and token bucket to continously refill allowance.
+Fractional Allowance Stablecoin (FAST) is an ERC20 token with role-based access control, allowing for fractional minting allowances. The contract leverages OpenZeppelin's libraries for secure and robust implementation. The primary features include role-based minting permissions, the ability to set fractional minting allowances and time elapse based allowance refill.
 
 ## Features
 
 - **Fractional Minting Allowance**: Allows the minter to mint tokens up to a specified fraction of the token's total supply.
-- **Token Bucket / Drip Method**: Layered on top of the fractional minting allowance, fill up allowance continously like sand in an hourglass. The allowance is increased by `dripAmount` * `dripTime`, capped at the max allowance defined by the frational bps.  
+- **Time Elapse Based Allowance Refill**: Layered on top of the fractional minting allowance, partially refill allowance using an `applyDrip()` function to increase the allowance based on time elapsed. The refill amount is determined by `dripAmount` * `timeElapsed` /  `dripInterval`, capped at the max allowance defined by the frational bps and toatal supply.  
 - **Role-Based Access Control**: Utilizes OpenZeppelin's `AccessControl` to manage roles such as `DEFAULT_ADMIN_ROLE`, `GOVERNANCE_ROLE`, and `MINTER_ROLE`.
   - Only `GOVERNANCE_ROLE` can request the minting allowance basis points to be updated.
   - Only `DEFAULT_ADMIN_ROLE` can approve basis points update request. 
+  - Only `MINTER_ROLE` can request dripAmount to be updated. 
+  - Only `GOVERNANCE_ROLE` can approve dripAmount update request. 
   - Only `GOVERNANCE_ROLE` can replenish mint allowance for the `MINTER_ROLE`.
   - Only `MINTER_ROLE` can mint. 
 
 ## Benefits
-The **Fractional Allowance** approach directly limits the downside risk from an attack or unauhorized minting from a malicious insider by setting the minter allowace to a small fraction of the total token supply. 
+The **Fractional Allowance** approach directly limits the downside financial risk from an attack or unauhorized minting by setting the minter allowance to a small fraction of the total token supply. 
+The refill model allow allowance to be slowly refilled before the next manual top-up to the max allowance by the `MINTER_ROLE`, reducing the risk of allowance running out due to spike in minting activities. 
 
 ## Contract Details
 
@@ -26,10 +29,6 @@ The **Fractional Allowance** approach directly limits the downside risk from an 
 - **MINTER_ROLE**: Role allowed to mint new tokens within the specified allowance.
 
 ### Functions
-
-- **mint**: Allows the minter to mint new tokens within the allowed limit.
-- **setMinterFraction**: Allows governance to set the fraction of the total supply that defines the minter allowance.
-- **replenishMinterAllowance**: Recalculates the minter’s allowance based on the current total supply and fraction.
 
 ## Installation
 
