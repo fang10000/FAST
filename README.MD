@@ -36,3 +36,9 @@ The refill model allow allowance to be slowly refilled before the next manual to
    ```sh
    git clone git@github.com:fang10000/FAST.git
    cd FAST
+
+2. **Scripts**  
+TODO
+
+3. **Tests**  
+TODO
